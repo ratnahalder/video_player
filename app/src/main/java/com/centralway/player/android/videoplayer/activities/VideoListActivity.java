@@ -36,6 +36,7 @@ import com.centralway.player.android.videoplayer.listener.RecyclerTouchListener;
 import com.centralway.player.android.videoplayer.utilities.VideoAlbum;
 import com.centralway.player.android.videoplayer.views.GridSpacingItemDecoration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -77,17 +78,16 @@ public class VideoListActivity extends AppCompatActivity {
                 recyclerView, new ClickListener() {
             @Override
             public void onClick(View view, final int position) {
-                // Cursor c = (Cursor) getListAdapter().getItem(position);
                AlbumsAdapter adapter = (AlbumsAdapter)recyclerView.getAdapter();
                VideoAlbum item = adapter.getItem(position);
                 int id = (int)item.getId();
-                ArrayList<Integer> newList = videoListId;
+
+                ArrayList<Integer> newList = (ArrayList<Integer>)videoListId.clone();
                 newList.removeAll(new ArrayList<>(newList.subList(0,newList.indexOf(id))));
 
                 Intent intent = new Intent(VideoListActivity.this, VideoPlayerActivity.class);
                 intent.putExtra(VIDEO_ID_LIST_EXTRA, newList);
                 startActivity(intent);
-                //formEntryStart(item.instanceId);
             }
         }));
 
