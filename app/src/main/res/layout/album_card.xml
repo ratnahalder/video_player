@@ -53,7 +53,8 @@
                 android:layout_below="@id/thumbnail"
                 android:layout_marginTop="@dimen/ic_album_overflow_margin_top"
                 android:scaleType="centerCrop"
-                android:src="@mipmap/ic_dots" />
+                android:src="@mipmap/ic_dots"
+                android:visibility="gone"/>
 
         </RelativeLayout>
 

@@ -10,6 +10,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.CollapsingToolbarLayout;
@@ -30,14 +31,12 @@ import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.centralway.player.android.videoplayer.R;
-import com.centralway.player.android.videoplayer.adapters.AlbumsAdapter;
+import com.centralway.player.android.videoplayer.adapters.VideoListAdapter;
 import com.centralway.player.android.videoplayer.listener.ClickListener;
 import com.centralway.player.android.videoplayer.listener.RecyclerTouchListener;
 import com.centralway.player.android.videoplayer.utilities.VideoAlbum;
 import com.centralway.player.android.videoplayer.views.GridSpacingItemDecoration;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 
 import static com.centralway.player.android.videoplayer.activities.VideoPlayerActivity.VIDEO_ID_LIST_EXTRA;
@@ -45,7 +44,7 @@ import static com.centralway.player.android.videoplayer.activities.VideoPlayerAc
 public class VideoListActivity extends AppCompatActivity {
 
     private RecyclerView recyclerView;
-    private AlbumsAdapter adapter;
+    private VideoListAdapter adapter;
     private List<VideoAlbum> videoList;
     private ArrayList<Integer> videoListId;
     private SharedPreferences permissionPref;
@@ -66,7 +65,7 @@ public class VideoListActivity extends AppCompatActivity {
 
         videoList = new ArrayList<>();
         videoListId = new ArrayList<>();
-        adapter = new AlbumsAdapter(this, videoList);
+        adapter = new VideoListAdapter(this, videoList);
 
 
         RecyclerView.LayoutManager mLayoutManager = new GridLayoutManager(this, 2);
@@ -78,7 +77,7 @@ public class VideoListActivity extends AppCompatActivity {
                 recyclerView, new ClickListener() {
             @Override
             public void onClick(View view, final int position) {
-               AlbumsAdapter adapter = (AlbumsAdapter)recyclerView.getAdapter();
+               VideoListAdapter adapter = (VideoListAdapter)recyclerView.getAdapter();
                VideoAlbum item = adapter.getItem(position);
                 int id = (int)item.getId();
 
@@ -149,28 +148,20 @@ public class VideoListActivity extends AppCompatActivity {
         String[] projection = { android.provider.MediaStore.Video.Media._ID,
                 android.provider.MediaStore.Video.Media.DATA,
                 android.provider.MediaStore.Video.Media.TITLE,
-                android.provider.MediaStore.Video.Media.SIZE};
+                MediaStore.Video.Media.DURATION};
         Cursor c = getContentResolver().query(uri, projection, null, null, null);
         if (c != null && c.moveToFirst()) {
             int _id = c.getColumnIndex(android.provider.MediaStore.Video.Media._ID);
             int _path = c.getColumnIndex(android.provider.MediaStore.Video.Media.DATA);
             int _title = c.getColumnIndex(android.provider.MediaStore.Video.Media.TITLE);
+            int _duration = c.getColumnIndex(MediaStore.Video.Media.DURATION);
             do{
-                Log.i("VIDEO", String.valueOf(c.getString(_id)));
-                VideoAlbum album = new VideoAlbum(c.getString(_title), 13, c.getString(_path), c.getLong(_id));
+                VideoAlbum album = new VideoAlbum(c.getString(_title), c.getInt(_duration), c.getString(_path), c.getLong(_id));
                 videoList.add(album);
                 videoListId.add((int)(c.getLong(_id)));
             }while (c.moveToNext());
-
-           /* while (c.moveToNext()) {
-                Log.i("VIDEO", c.getString(0));
-                Log.i("VIDEO_1", c.getString(1));
-                Log.i("VIDEO_2", c.getString(2));
-                Log.i("VIDEO_3", c.getString(3));
-               // Log.d("VIDEO_4", c.getString(4));
-            }*/
-            c.close();
         }
+        c.close();
 
         adapter.notifyDataSetChanged();
     }
@@ -301,55 +292,4 @@ public class VideoListActivity extends AppCompatActivity {
             }
         }
     }
-
-    /**
-     * Adding few albums for testing
-     */
- /*   private void prepareAlbums() {
-        int[] covers = new int[]{
-                R.drawable.album1,
-                R.drawable.album2,
-                R.drawable.album3,
-                R.drawable.album4,
-                R.drawable.album5,
-                R.drawable.album6,
-                R.drawable.album7,
-                R.drawable.album8,
-                R.drawable.album9,
-                R.drawable.album10,
-                R.drawable.album11};
-
-        VideoAlbum a = new VideoAlbum("True Romance", 13, covers[0]);
-        videoList.add(a);
-
-        a = new VideoAlbum("Xscpae", 8, covers[1]);
-        videoList.add(a);
-
-        a = new VideoAlbum("Maroon 5", 11, covers[2]);
-        videoList.add(a);
-
-        a = new VideoAlbum("Born to Die", 12, covers[3]);
-        videoList.add(a);
-
-        a = new VideoAlbum("Honeymoon", 14, covers[4]);
-        videoList.add(a);
-
-        a = new VideoAlbum("I Need a Doctor", 1, covers[5]);
-        videoList.add(a);
-
-        a = new VideoAlbum("Loud", 11, covers[6]);
-        videoList.add(a);
-
-        a = new VideoAlbum("Legend", 14, covers[7]);
-        videoList.add(a);
-
-        a = new VideoAlbum("Hello", 11, covers[8]);
-        videoList.add(a);
-
-        a = new VideoAlbum("Greatest Hits", 17, covers[9]);
-        videoList.add(a);
-
-        adapter.notifyDataSetChanged();
-    }*/
-
 }
