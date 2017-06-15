@@ -84,19 +84,11 @@ import java.util.UUID;
 public class VideoPlayerActivity extends AppCompatActivity implements View.OnClickListener, ExoPlayer.EventListener,
         PlaybackControlView.VisibilityListener {
 
-    private VideoView videoView;
+
     public static final String DRM_SCHEME_UUID_EXTRA = "drm_scheme_uuid";
     public static final String DRM_LICENSE_URL = "drm_license_url";
     public static final String DRM_KEY_REQUEST_PROPERTIES = "drm_key_request_properties";
     public static final String PREFER_EXTENSION_DECODERS = "prefer_extension_decoders";
-
-    public static final String ACTION_VIEW = "com.google.android.exoplayer.demo.action.VIEW";
-    public static final String EXTENSION_EXTRA = "extension";
-
-    public static final String ACTION_VIEW_LIST =
-            "com.google.android.exoplayer.demo.action.VIEW_LIST";
-    public static final String URI_LIST_EXTRA = "uri_list";
-    public static final String EXTENSION_LIST_EXTRA = "extension_list";
 
     public static final String VIDEO_ID_LIST_EXTRA = "video_id_list";
 
@@ -341,59 +333,22 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
             debugViewHelper.start();
         }
         if (needNewPlayer || needRetrySource) {
-            String action = intent.getAction();
-            Uri[] uris;
-            String[] extensions;
-            /*if (ACTION_VIEW.equals(action)) {
-                uris = new Uri[] {intent.getData()};
-                extensions = new String[] {intent.getStringExtra(EXTENSION_EXTRA)};
-                Log.i(VideoPlayerActivity.class.getSimpleName(), "****extensions = " + extensions);
-            } else if (ACTION_VIEW_LIST.equals(action)) {
-                String[] uriStrings = intent.getStringArrayExtra(URI_LIST_EXTRA);
-                uris = new Uri[uriStrings.length];
-                for (int i = 0; i < uriStrings.length; i++) {
-                    uris[i] = Uri.parse(uriStrings[i]);
-                }
-                extensions = intent.getStringArrayExtra(EXTENSION_LIST_EXTRA);
-                if (extensions == null) {
-                    extensions = new String[uriStrings.length];
-                }
-            } else {
-                showToast(getString(R.string.unexpected_intent_action, action));
-                return;
-            }
-            if (Util.maybeRequestReadExternalStoragePermission(this, uris)) {
-                // The player will be reinitialized if the permission is granted.
-                return;
-            }*/
-
-            uris = new Uri[videoListId.size()];
+            Uri[] uris = new Uri[videoListId.size()];
             int index = 0;
             for (Integer i: videoListId) {
                 uris[index] = ContentUris.withAppendedId(
                         android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, i);
                 index++;
             }
-           /* Uri contentUri = ContentUris.withAppendedId(
-                    android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, 20023);
-            Uri contentUri2 = ContentUris.withAppendedId(
-                    android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, 20196);
-            Uri contentUri3 = ContentUris.withAppendedId(
-                    android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, 20930);
-            uris = new Uri[] {contentUri, contentUri2, contentUri3};
-*/            extensions = new String[] {"mp4", "mp4", "mp4"};
-
-
 
             MediaSource[] mediaSources = new MediaSource[uris.length];
             for (int i = 0; i < uris.length; i++) {
-                //mediaSources[i] = buildMediaSource(uris[i], extensions[i]);
-                mediaSources[i] = buildMediaSource_new(uris[i]);
+                mediaSources[i] = buildMediaSource(uris[i]);
             }
             MediaSource mediaSource = mediaSources.length == 1 ? mediaSources[0]
                     : new ConcatenatingMediaSource(mediaSources);
             boolean haveResumePosition = resumeWindow != C.INDEX_UNSET;
-            Log.i(VideoPlayerActivity.class.getSimpleName(), "**haveResumePosition = " + haveResumePosition);
+
             if (haveResumePosition) {
                 player.seekTo(resumeWindow, resumePosition);
             }
@@ -404,33 +359,9 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
     }
 
 
-    private MediaSource buildMediaSource_new(Uri uri) {
+    private MediaSource buildMediaSource(Uri uri) {
         return new ExtractorMediaSource(uri, mediaDataSourceFactory, new DefaultExtractorsFactory(),
                 mainHandler, eventLogger);
-    }
-    private MediaSource buildMediaSource(Uri uri, String overrideExtension) {
-        int type = TextUtils.isEmpty(overrideExtension) ? Util.inferContentType(uri)
-                : Util.inferContentType("." + overrideExtension);
-        switch (type) {
-            case C.TYPE_SS:
-                Log.i(VideoPlayerActivity.class.getSimpleName(), "****here 1 = " );
-                return new SsMediaSource(uri, buildDataSourceFactory(false),
-                        new DefaultSsChunkSource.Factory(mediaDataSourceFactory), mainHandler, eventLogger);
-            case C.TYPE_DASH:
-                Log.i(VideoPlayerActivity.class.getSimpleName(), "****here 2 = " );
-                return new DashMediaSource(uri, buildDataSourceFactory(false),
-                        new DefaultDashChunkSource.Factory(mediaDataSourceFactory), mainHandler, eventLogger);
-            case C.TYPE_HLS:
-                Log.i(VideoPlayerActivity.class.getSimpleName(), "****here 3 = " );
-                return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler, eventLogger);
-            case C.TYPE_OTHER:
-                Log.i(VideoPlayerActivity.class.getSimpleName(), "****here 4 = " );
-                return new ExtractorMediaSource(uri, mediaDataSourceFactory, new DefaultExtractorsFactory(),
-                        mainHandler, eventLogger);
-            default: {
-                throw new IllegalStateException("Unsupported type: " + type);
-            }
-        }
     }
 
     private DrmSessionManager<FrameworkMediaCrypto> buildDrmSessionManager(UUID uuid,
@@ -607,34 +538,7 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
 
         MappingTrackSelector.MappedTrackInfo mappedTrackInfo = trackSelector.getCurrentMappedTrackInfo();
         if (mappedTrackInfo == null) {
-            //Log.i(PlayerActivity.class.getSimpleName(), "***return null**");
             return;
-        }
-        Log.i(VideoPlayerActivity.class.getSimpleName(), "***return mappedTrackInfo = " + mappedTrackInfo);
-        for (int i = 0; i < mappedTrackInfo.length; i++) {
-
-            TrackGroupArray trackGroups = mappedTrackInfo.getTrackGroups(i);
-            if (trackGroups.length != 0) {
-                Button button = new Button(this);
-                int label;
-                switch (player.getRendererType(i)) {
-                    case C.TRACK_TYPE_AUDIO:
-                        label = R.string.audio;
-                        break;
-                    case C.TRACK_TYPE_VIDEO:
-                        label = R.string.video;
-                        break;
-                    case C.TRACK_TYPE_TEXT:
-                        label = R.string.text;
-                        break;
-                    default:
-                        continue;
-                }
-                button.setText(label);
-                button.setTag(i);
-                button.setOnClickListener(this);
-                debugRootView.addView(button, debugRootView.getChildCount() - 1);
-            }
         }
     }
 
@@ -665,5 +569,4 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
     }
 
 }
-
 
