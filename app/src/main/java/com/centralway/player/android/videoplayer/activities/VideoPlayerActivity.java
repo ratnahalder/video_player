@@ -3,11 +3,15 @@ package com.centralway.player.android.videoplayer.activities;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
@@ -17,6 +21,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -91,6 +96,8 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
     public static final String PREFER_EXTENSION_DECODERS = "prefer_extension_decoders";
 
     public static final String VIDEO_ID_LIST_EXTRA = "video_id_list";
+    public static final String LAST_VOLUME_STATUS = "last_volume_status";
+    public static final String VOLUME_STATUS_MUTE = "volume_status_mute";
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
     private static final CookieManager DEFAULT_COOKIE_MANAGER;
@@ -120,14 +127,13 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
     private SeekBar volumeSeekBar;
     private AudioManager audioManager;
     private ArrayList<Integer> videoListId;
+    private SharedPreferences pref;
+    private ImageButton volumeButton;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        /*setContentView(R.layout.activity_video_player);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);*/
 
         shouldAutoPlay = true;
         clearResumePosition();
@@ -145,34 +151,80 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
         retryButton = (Button) findViewById(R.id.retry_button);
         retryButton.setOnClickListener(this);
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        pref = PreferenceManager.getDefaultSharedPreferences(this);
 
         simpleExoPlayerView = (SimpleExoPlayerView) findViewById(R.id.player_view);
         simpleExoPlayerView.setControllerVisibilityListener(this);
         simpleExoPlayerView.requestFocus();
         videoListId = getIntent().getIntegerArrayListExtra(VIDEO_ID_LIST_EXTRA);
         volumeSeekBar = (SeekBar)findViewById(R.id.seekBarVolume);
-        volumeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            int progress = 0;
+        volumeSeekBar.setOnSeekBarChangeListener(seekBarListener);
+        initializeSeekBar();
+        /*int lastVolumeStatus = pref.getInt(LAST_VOLUME_STATUS, 0);
+        volumeSeekBar.setProgress(lastVolumeStatus);
+        volumeSeekBar.getProgressDrawable().setColorFilter(Color.RED, PorterDuff.Mode.SRC_IN);
+        volumeSeekBar.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN);*/
 
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progressValue, boolean fromUser) {
-                progress = progressValue;
-                //Toast.makeText(getApplicationContext(), "Changing seekbar's progress", Toast.LENGTH_SHORT).show();
+        volumeButton = (ImageButton)findViewById(R.id.exo_volume);
+        volumeButton.setOnClickListener(buttonListener);
+        boolean isVolumeMute = pref.getBoolean(VOLUME_STATUS_MUTE, false);
+        if(isVolumeMute) volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.mute_volume));
+        Log.i(VideoPlayerActivity.class.getSimpleName(), "***max = " + audioManager.getStreamMaxVolume(audioManager.STREAM_MUSIC));
+    }
+
+    private void initializeSeekBar(){
+        int lastVolumeStatus = pref.getInt(LAST_VOLUME_STATUS, 0);
+        int maxVolume = audioManager.getStreamMaxVolume(audioManager.STREAM_MUSIC);
+        volumeSeekBar.setProgress(lastVolumeStatus);
+        volumeSeekBar.incrementProgressBy(maxVolume/10);
+        volumeSeekBar.setMax(maxVolume);
+        volumeSeekBar.getProgressDrawable().setColorFilter(Color.RED, PorterDuff.Mode.SRC_IN);
+        volumeSeekBar.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN);
+    }
+
+    private SeekBar.OnSeekBarChangeListener seekBarListener = new SeekBar.OnSeekBarChangeListener() {
+        int progress = 0;
+
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int progressValue, boolean fromUser) {
+            progress = progressValue;
+
+            // change volume depending on volume bar value
+            if(player != null) {//for the first time no need to update volume, cause OS already keep that trace
                 audioManager.setStreamVolume(player.getAudioStreamType(), progressValue, 0);
             }
 
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                //Toast.makeText(getApplicationContext(), "Started tracking seekbar", Toast.LENGTH_SHORT).show();
-            }
+            //keep last volume status to reuse later time
+            pref.edit().putInt(LAST_VOLUME_STATUS, progressValue).commit();
+        }
 
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                //textView.setText("Covered: " + progress + "/" + volumeSeekBar.getMax());
-                //Toast.makeText(getApplicationContext(), "Stopped tracking seekbar", Toast.LENGTH_SHORT).show();
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {
+        }
+
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {
+        }
+    };
+
+    private ImageButton.OnClickListener buttonListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            int currentVolumeStatus = pref.getInt(LAST_VOLUME_STATUS, 0);
+            boolean isAlreadyMute = pref.getBoolean(VOLUME_STATUS_MUTE, false);
+            if(!isAlreadyMute){
+                Log.i(VideoPlayerActivity.class.getSimpleName(), "**mute and volume = " + currentVolumeStatus);
+                volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.mute_volume));
+                audioManager.setStreamVolume(player.getAudioStreamType(), 0, 0);
+                pref.edit().putBoolean(VOLUME_STATUS_MUTE, true).commit();
+            }else{
+                Log.i(VideoPlayerActivity.class.getSimpleName(), "**volume = " + currentVolumeStatus);
+                volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.high_volume));
+                audioManager.setStreamVolume(player.getAudioStreamType(), currentVolumeStatus, 0);
+                pref.edit().putBoolean(VOLUME_STATUS_MUTE, false).commit();
             }
-        });
-    }
+        }
+    };
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
