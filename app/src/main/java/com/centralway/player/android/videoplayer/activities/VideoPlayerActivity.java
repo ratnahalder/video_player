@@ -14,7 +14,6 @@ import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -26,7 +25,6 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.VideoView;
 
 import com.centralway.player.android.videoplayer.R;
 import com.centralway.player.android.videoplayer.application.VideoPlayerApplication;
@@ -54,11 +52,6 @@ import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.TrackGroupArray;
-import com.google.android.exoplayer2.source.dash.DashMediaSource;
-import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
-import com.google.android.exoplayer2.source.hls.HlsMediaSource;
-import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
-import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector;
@@ -76,7 +69,6 @@ import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.UUID;
 
 /**
@@ -98,6 +90,7 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
     public static final String VIDEO_ID_LIST_EXTRA = "video_id_list";
     public static final String LAST_VOLUME_STATUS = "last_volume_status";
     public static final String VOLUME_STATUS_MUTE = "volume_status_mute";
+    public static final String FIRST_RUN = "first_run";
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
     private static final CookieManager DEFAULT_COOKIE_MANAGER;
@@ -160,16 +153,11 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
         volumeSeekBar = (SeekBar)findViewById(R.id.seekBarVolume);
         volumeSeekBar.setOnSeekBarChangeListener(seekBarListener);
         initializeSeekBar();
-        /*int lastVolumeStatus = pref.getInt(LAST_VOLUME_STATUS, 0);
-        volumeSeekBar.setProgress(lastVolumeStatus);
-        volumeSeekBar.getProgressDrawable().setColorFilter(Color.RED, PorterDuff.Mode.SRC_IN);
-        volumeSeekBar.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN);*/
 
         volumeButton = (ImageButton)findViewById(R.id.exo_volume);
         volumeButton.setOnClickListener(buttonListener);
         boolean isVolumeMute = pref.getBoolean(VOLUME_STATUS_MUTE, false);
         if(isVolumeMute) volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.mute_volume));
-        Log.i(VideoPlayerActivity.class.getSimpleName(), "***max = " + audioManager.getStreamMaxVolume(audioManager.STREAM_MUSIC));
     }
 
     private void initializeSeekBar(){
@@ -213,12 +201,10 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
             int currentVolumeStatus = pref.getInt(LAST_VOLUME_STATUS, 0);
             boolean isAlreadyMute = pref.getBoolean(VOLUME_STATUS_MUTE, false);
             if(!isAlreadyMute){
-                Log.i(VideoPlayerActivity.class.getSimpleName(), "**mute and volume = " + currentVolumeStatus);
                 volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.mute_volume));
                 audioManager.setStreamVolume(player.getAudioStreamType(), 0, 0);
                 pref.edit().putBoolean(VOLUME_STATUS_MUTE, true).commit();
             }else{
-                Log.i(VideoPlayerActivity.class.getSimpleName(), "**volume = " + currentVolumeStatus);
                 volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.high_volume));
                 audioManager.setStreamVolume(player.getAudioStreamType(), currentVolumeStatus, 0);
                 pref.edit().putBoolean(VOLUME_STATUS_MUTE, false).commit();
@@ -269,6 +255,11 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
         super.onResume();
         if ((Util.SDK_INT <= 23 || player == null)) {
             initializePlayer();
+        }
+        boolean isFirstRun = pref.getBoolean(FIRST_RUN,true);
+        if(isFirstRun){
+            pref.edit().putBoolean(FIRST_RUN,false).commit();
+            volumeSeekBar.setProgress(audioManager.getStreamMaxVolume(player.getAudioStreamType()));
         }
     }
 
