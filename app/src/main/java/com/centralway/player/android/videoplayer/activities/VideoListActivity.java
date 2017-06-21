@@ -1,6 +1,8 @@
 package com.centralway.player.android.videoplayer.activities;
 
 import android.Manifest;
+import android.app.SearchManager;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -21,10 +23,13 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.util.TypedValue;
+import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -36,8 +41,10 @@ import com.centralway.player.android.videoplayer.listener.ClickListener;
 import com.centralway.player.android.videoplayer.listener.RecyclerTouchListener;
 import com.centralway.player.android.videoplayer.utilities.VideoAlbum;
 import com.centralway.player.android.videoplayer.views.GridSpacingItemDecoration;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.centralway.player.android.videoplayer.activities.VideoPlayerActivity.VIDEO_ID_LIST_EXTRA;
 
@@ -45,8 +52,9 @@ public class VideoListActivity extends AppCompatActivity {
 
     private RecyclerView recyclerView;
     private VideoListAdapter adapter;
-    private List<VideoAlbum> videoList;
+    private ArrayList<VideoAlbum> videoList;
     private ArrayList<Integer> videoListId;
+    private ArrayList<VideoAlbum> originalVideoList;
     private SharedPreferences permissionPref;
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 10;
     private static final int REQUEST_PERMISSION_SETTING = 11;
@@ -66,7 +74,6 @@ public class VideoListActivity extends AppCompatActivity {
         videoList = new ArrayList<>();
         videoListId = new ArrayList<>();
         adapter = new VideoListAdapter(this, videoList);
-
 
         RecyclerView.LayoutManager mLayoutManager = new GridLayoutManager(this, 2);
         recyclerView.setLayoutManager(mLayoutManager);
@@ -101,6 +108,11 @@ public class VideoListActivity extends AppCompatActivity {
 
        // retrieveVideoInfo();
         checkAllPermissions();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
     }
 
     /**
@@ -162,7 +174,7 @@ public class VideoListActivity extends AppCompatActivity {
             }while (c.moveToNext());
         }
         c.close();
-
+        originalVideoList = (ArrayList<VideoAlbum>) videoList.clone();
         adapter.notifyDataSetChanged();
     }
 
@@ -291,5 +303,64 @@ public class VideoListActivity extends AppCompatActivity {
                 //proceedAfterPermission();
             }
         }
+    }
+
+    private void updateListView(String charSequence) {
+        if (charSequence == null || charSequence.length() == 0) {
+            videoList.clear();
+            videoList = (ArrayList<VideoAlbum>)originalVideoList.clone();
+        }else {
+            ArrayList<VideoAlbum> sortedVideoList = new ArrayList<>();
+            for (VideoAlbum data : videoList) {
+                if (data.getName().contains(charSequence)) {
+                    if (!sortedVideoList.contains(data)) {
+                        sortedVideoList.add(data);
+                    }
+                }
+            }
+            videoList.clear();
+            videoList = (ArrayList<VideoAlbum>)sortedVideoList.clone();
+        }
+
+        adapter.notifyDataSetChanged();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.menu_video_list, menu);
+
+        SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
+        SearchView searchView = (SearchView) menu.findItem(R.id.search).getActionView();
+
+        searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName()));
+        searchView.setIconifiedByDefault(false);
+
+        int options = searchView.getImeOptions();
+        searchView.setImeOptions(options| EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+
+        SearchView.OnQueryTextListener textChangeListener = new SearchView.OnQueryTextListener()
+        {
+            @Override
+            public boolean onQueryTextChange(String newText)
+            {
+
+                System.out.println("on text change text: "+newText);
+                updateListView(newText);
+                return true;
+            }
+            @Override
+            public boolean onQueryTextSubmit(String query)
+            {
+                // this is your adapter that will be filtered
+                //  adapter.getFilter().filter(query);
+                System.out.println("on query submit: "+query);
+                return true;
+            }
+        };
+        searchView.setOnQueryTextListener(textChangeListener);
+
+        return super.onCreateOptionsMenu(menu);
     }
 }
