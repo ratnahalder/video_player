@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.media.AudioManager;
@@ -12,6 +13,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.preference.PreferenceManager;
+import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -122,6 +124,7 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
     private ArrayList<Integer> videoListId;
     private SharedPreferences pref;
     private ImageButton volumeButton;
+    private boolean isVolumeMute;
 
 
     @Override
@@ -156,8 +159,10 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
 
         volumeButton = (ImageButton)findViewById(R.id.exo_volume);
         volumeButton.setOnClickListener(buttonListener);
-        boolean isVolumeMute = pref.getBoolean(VOLUME_STATUS_MUTE, false);
-        if(isVolumeMute) volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.mute_volume));
+        isVolumeMute = pref.getBoolean(VOLUME_STATUS_MUTE, false);
+        if(isVolumeMute) {
+            volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.mute_volume));
+        }
     }
 
     private void initializeSeekBar(){
@@ -170,6 +175,7 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
         volumeSeekBar.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN);
     }
 
+
     private SeekBar.OnSeekBarChangeListener seekBarListener = new SeekBar.OnSeekBarChangeListener() {
         int progress = 0;
 
@@ -180,6 +186,9 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
             // change volume depending on volume bar value
             if(player != null) {//for the first time no need to update volume, cause OS already keep that trace
                 audioManager.setStreamVolume(player.getAudioStreamType(), progressValue, 0);
+                if(isVolumeMute){//is volume stage is mute then set high volume icon.
+                    volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.high_volume));
+                }
             }
 
             //keep last volume status to reuse later time
@@ -204,10 +213,12 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
                 volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.mute_volume));
                 audioManager.setStreamVolume(player.getAudioStreamType(), 0, 0);
                 pref.edit().putBoolean(VOLUME_STATUS_MUTE, true).commit();
+                isVolumeMute = true;
             }else{
                 volumeButton.setBackgroundDrawable(getResources().getDrawable(R.drawable.high_volume));
                 audioManager.setStreamVolume(player.getAudioStreamType(), currentVolumeStatus, 0);
                 pref.edit().putBoolean(VOLUME_STATUS_MUTE, false).commit();
+                isVolumeMute = false;
             }
         }
     };
@@ -255,6 +266,7 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
         super.onResume();
         if ((Util.SDK_INT <= 23 || player == null)) {
             initializePlayer();
+
         }
         boolean isFirstRun = pref.getBoolean(FIRST_RUN,true);
         if(isFirstRun){
@@ -323,8 +335,32 @@ public class VideoPlayerActivity extends AppCompatActivity implements View.OnCli
     }
 
     // Internal methods
+    private void initializeSelectedVideo() {
+        Intent intent = getIntent();
+        String title = intent.getStringExtra(Intent.EXTRA_TITLE);
+        if (title == null) {
+            videoListId = new ArrayList<>();
+            Cursor cursor = null;
+            try {
+                cursor = getContentResolver().query(intent.getData(),
+                        new String[] {MediaStore.Video.VideoColumns._ID}, null, null, null);
+                if (cursor != null && cursor.moveToNext()) {
+                    videoListId.add(cursor.getInt(0));
+                    //Log.i(VideoPlayerActivity.class.getSimpleName(), "title: " + title);
+                }
+            } catch (Throwable t) {
+                Log.w(VideoPlayerActivity.class.getSimpleName(), "cannot get title from: " + intent.getDataString(), t);
+            } finally {
+                if (cursor != null) cursor.close();
+            }
+        }
+    }
 
     private void initializePlayer() {
+        if(videoListId == null || videoListId.size()<=0){
+            initializeSelectedVideo();
+        }
+
         Intent intent = getIntent();
         boolean needNewPlayer = player == null;
         if (needNewPlayer) {
